@@ -46,6 +46,7 @@ FD = abs(x_diff) + abs(y_diff) + abs(z_diff) + abs(p_mm_diff) + ...
 FDavg = mean(FD,'omitnan');
 
 % Calculate motion correlations with task regressor(s)
+% Sum task regressors if more than one
 if task_file2 == 0
     task = task_file1;
 else
@@ -56,11 +57,39 @@ if size(task,2) > size(task,1)
     task = task';
 end
 
-corrX = corr(task,x);
-corrY = corr(task,y);
-corrZ = corr(task,z);
-corrRoll = corr(task,r_deg);
-corrPitch = corr(task,p_deg);
-corrYaw = corr(task,y_deg);
+% If task vector is only zeros and ones, use point biserial correlation
+% Point biserial reference: https://dx.doi.org/10.4135/9781412952644.n57
+if isempty(find(task~=0 & task~=1,1)) == 1
+    p = sum(task)/length(task);
+    q = 1 - p;
+
+    allMot = zeros(1,6);
+    for mot = 1:6
+        dir = motion_file(:,mot);
+        one_f = dir(task == 1);
+        zed_f = dir(task == 0);
+        m1_f=mean(one_f);
+        m0_f=mean(zed_f);
+        s_f=std(dir);
+
+        allMot(mot) = ((m1_f-m0_f)/s_f)*sqrt(p*q);
+    end
+
+    corrX = allMot(:,6);
+    corrY = allMot(:,5);
+    corrZ = allMot(:,4);
+    corrRoll = allMot(:,3);
+    corrPitch = allMot(:,2);
+    corrYaw = allMot(:,1);
+
+else
+    % Pearson correlation
+    corrX = corr(task,x);
+    corrY = corr(task,y);
+    corrZ = corr(task,z);
+    corrRoll = corr(task,r_deg);
+    corrPitch = corr(task,p_deg);
+    corrYaw = corr(task,y_deg);
+end
 
 end

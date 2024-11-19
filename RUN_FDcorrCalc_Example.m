@@ -28,9 +28,12 @@ for i = 1:length(subs)
             task = tasks{k};
             
             %%%% File paths - EDIT
+            % output from volume registration (*_mc_demean.1D)
             motion_file = importdata([input_dir '/BIDS/derivatives/' sub '/func/' task '/output.mc/' sub '_' task '_rm10_1_mc_demean.1D']);
-            task_file1 = importdata([input_dir '/Other/TaskRegressors/' sub '_' task '_RGrip_ForceScaled_HRFconv.txt']);
-            task_file2 = importdata([input_dir '/Other/TaskRegressors/' sub '_' task '_LGrip_ForceScaled_HRFconv.txt']);
+            
+            % task regressor(s) BEFORE convolution with HRF, downsampled to TR
+            task_file1 = importdata([input_dir '/Other/TaskRegressors/' sub '_' task '_RGrip_noConv.txt']);
+            task_file2 = importdata([input_dir '/Other/TaskRegressors/' sub '_' task '_LGrip_noConv.txt']);
                 % Run function without task_file2 if there is only 1 task regressor
 
             [FDavg,corrX,corrY,corrZ,corrRoll,corrPitch,corrYaw] = FDcorrCalc(motion_file,task_file1,task_file2);
