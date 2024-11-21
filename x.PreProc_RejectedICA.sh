@@ -121,9 +121,8 @@ if [ $model == 'ConsOrth' ]; then
     -ort ${motion_deriv}.1D \
     -ort ${task1}.txt \
     -polort ${Legendre_degree}  \
-    -prefix rejectedTrans_ort.1D \
+    -prefix rejected_ort.1D \
     -input rejected.1D
-    1dtranspose rejectedTrans_ort.1D > rejected_ort.1D
   fi
 
   if [ $# -eq 10 ]; then
@@ -135,9 +134,8 @@ if [ $model == 'ConsOrth' ]; then
     -ort ${task1}.txt \
     -ort ${task2}.txt \
     -polort ${Legendre_degree}  \
-    -prefix rejectedTrans_ort.1D \
+    -prefix rejected_ort.1D \
     -input rejected.1D
-    1dtranspose rejectedTrans_ort.1D > rejected_ort.1D
   fi
 
   1d_tool.py -infile rejected_ort.1D -write rejected_forGLM.1D
