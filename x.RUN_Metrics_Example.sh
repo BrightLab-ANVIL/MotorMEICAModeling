@@ -70,7 +70,7 @@ then
       anat2func
 
     # Transform pre-central gyrus mask to functional space
-    ./x.PreProc_Transform_nonlin.sh ${parent_dir}/Other/Masks/harvardoxford-cortical_prob_Precentral_Gyrus \
+    ./x.PreProc_Transform_nonlin.sh ${parent_dir}/Other/Masks/harvardoxford-cortical_prob_Precentral_Gyrus_2mm \
       ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_ero \
       ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/${subject}_${task}_stand2func_warp \
       ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg \
@@ -78,7 +78,7 @@ then
 
     # Find intersection of grey matter and pre-central gyrus masks to use in tSNR calculation
     3dcalc -a ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_mask_p5_anat2func.nii.gz \
-      -b ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/harvardoxford-cortical_prob_Precentral_Gyrus_stand2func.nii.gz \
+      -b ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/harvardoxford-cortical_prob_Precentral_Gyrus_2mm_stand2func.nii.gz \
       -expr 'a*b' -prefix ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_precentralGyrus_mask.nii.gz
   fi
 
