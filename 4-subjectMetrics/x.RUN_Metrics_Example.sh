@@ -190,8 +190,7 @@ then
 
     ./x.spatialCorr_calc.sh ${bcoef_file1} ${bcoef_file2} ${mask} ${output_dir} ${prefix}
 
-    read -ra values < ${output_dir}/${prefix}_spatialCorr.txt
-    spatialCorr=${values[2]}
+    read -ra spatialCorr < ${output_dir}/${prefix}_spatialCorr.txt
 
     echo -e ${studyName} '\t' ${subject} '\t' ${session} '\t' ${task} '\t' ${model} '\t' ${reg} '\t' ${spatialCorr} >> ${parent_dir}/${studyName}_spatialCorr.txt
 
