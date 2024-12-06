@@ -28,7 +28,7 @@ then
 fi
 
 # Compute spatial correlation within mask
-corr=`fslcc -m ${mask}.nii.gz --noabs -p 3 ${bcoef_file1}.nii.gz ${bcoef_file2}.nii.gz`
+corr=`3ddot -mask ${mask}.nii.gz ${bcoef_file1}.nii.gz ${bcoef_file2}.nii.gz`
 
 # Make tSNR outputs global variables
 echo ${corr} > ${output_dir}/${prefix}_spatialCorr.txt
