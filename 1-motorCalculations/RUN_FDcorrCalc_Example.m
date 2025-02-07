@@ -36,7 +36,8 @@ for i = 1:length(subs)
             task_file2 = importdata([input_dir '/Other/TaskRegressors/' sub '_' task '_LGrip_noConv.txt']);
                 % Run function without task_file2 if there is only 1 task regressor
 
-            [FDavg,corrX,corrY,corrZ,corrRoll,corrPitch,corrYaw] = FDcorrCalc(motion_file,task_file1,task_file2);
+            % *** EDITED LINE ***
+            [FDavg,corrX,corrY,corrZ,corrRoll,corrPitch,corrYaw,R2_adjusted] = FDcorrCalc(motion_file,task_file1,task_file2);
 
             %THIS IS NEW:
             % Linear model of task vs motion parameter
@@ -64,7 +65,8 @@ for i = 1:length(subs)
             vals = [vals;{study, sub, ses, task, 'Roll', corrRoll}];
             vals = [vals;{study, sub, ses, task, 'Pitch', corrPitch}];
             vals = [vals;{study, sub, ses, task, 'Yaw', corrYaw}];
-            vals = [vals;{study, sub, ses, task, 'AdjR2', R2_adjusted}];
+            vals = [vals;{study, sub, ses, task, 'AdjR2', R2_adjusted}]; %% ***NEW LINE
+
 
         end
     end
