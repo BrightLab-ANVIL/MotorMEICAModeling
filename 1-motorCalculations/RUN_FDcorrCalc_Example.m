@@ -39,24 +39,6 @@ for i = 1:length(subs)
             % *** EDITED LINE ***
             [FDavg,corrX,corrY,corrZ,corrRoll,corrPitch,corrYaw,R2_adjusted] = FDcorrCalc(motion_file,task_file1,task_file2);
 
-            %THIS IS NEW:
-            % Linear model of task vs motion parameter
-            z = motion_file(:,4); % superior
-            y = motion_file(:,5); % left
-            x = motion_file(:,6); % posterior
-            y_deg = motion_file(:,1);
-            p_deg = motion_file(:,2);
-            r_deg = motion_file(:,3);
-
-            % Create a table
-            tbl = table(task_file1, x, y, z,  y_deg, p_deg, r_deg);
-
-            % Fit the linear model
-            mdl = fitlm(tbl, 'task_file1 ~ x + y + z + y_deg + p_deg + r_deg');
-
-            % Get the adjusted R-squared value
-            R2_adjusted = mdl.Rsquared.Adjusted;
-
             % Add data to table
             vals = [vals;{study, sub, ses, task, 'FD', FDavg}];
             vals = [vals;{study, sub, ses, task, 'X', corrX}];
