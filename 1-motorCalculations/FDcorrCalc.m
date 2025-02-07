@@ -1,6 +1,6 @@
 % FD and motion correlation calculations
 
-function [FDavg, corrX, corrY, corrZ, corrRoll, corrPitch, corrYaw] = FDcorrCalc(motion_file, task_file1, task_file2)
+function [FDavg, corrX, corrY, corrZ, corrRoll, corrPitch, corrYaw, R2_adjusted] = FDcorrCalc(motion_file, task_file1, task_file2)
     % set default values so task_file2 can be an optional argument
     arguments
         motion_file = 0;
@@ -91,5 +91,16 @@ else
     corrPitch = corr(task,p_deg);
     corrYaw = corr(task,y_deg);
 end
+
+% Calculate R^2 of model fit for task regressor(s) vs all motion
+% Linear model of task vs motion parameter
+% Create a table
+tbl = table(task, x, y, z,  y_deg, p_deg, r_deg);
+
+% Fit the linear model
+mdl = fitlm(tbl, 'task ~ x + y + z + y_deg + p_deg + r_deg');
+
+% Get the adjusted R-squared value
+R2_adjusted = mdl.Rsquared.Adjusted;
 
 end
