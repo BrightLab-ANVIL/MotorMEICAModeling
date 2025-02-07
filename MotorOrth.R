@@ -32,13 +32,13 @@ motValsMH <- read.csv(paste0(onedrive,"/Motion/MS_HAND_MotionVals.csv"))
 motValsMH$Session <- factor(motValsMH$Session,levels=c("ses-01","ses-03"),labels=c("ses-01","ses-02"))
 
 motVals <- rbind(motValsHH,motValsHS,motValsMF,motValsMH)
-motVals$Metric <- factor(motVals$Metric,levels=c("FD","X","Y","Z","Roll","Pitch","Yaw"))
+motVals$Metric <- factor(motVals$Metric,levels=c("FD","X","Y","Z","Roll","Pitch","Yaw","R2"))
 motVals$Task <- factor(motVals$Task,levels=c("Hand","MOTOR10","MOTOR25","MOTOR40","HAND","FOOT"),labels=c("Healthy HandGrasp","Healthy ShAbd 10%","Healthy ShAbd 25%","Healthy ShAbd 40%","MS HandGrasp","MS AnkFlex"))
 motVals$Session <- factor(motVals$Session,labels=c("Run 1","Run 2"))
 
 # motVals$Subject <- factor(motVals$Subject,levels=c("sub-02","sub-03","sub-05","sub-09","sub-04","sub-11","sub-10","sub-07"),labels=c(1,2,3,4,5,6,7,8))
 
-pMotCorr <-
+# pMotCorr <-
   ggplot(data=subset(motVals,Metric!='FD'),mapping=aes(x=Metric,y=Subject)) +
   facet_grid(cols=vars(Session),rows=vars(Task),space="free",scales="free",switch="x") +
   geom_tile(aes(fill=abs(Value))) +
@@ -522,10 +522,11 @@ sig_df2 <- data.frame(
 sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
   
 # Plot tSNR vs FD bins
-# pTstat <-
+pTstatFDbin <-
   ggplot(data=subset(tstat,FDbin!="NA"),mapping=aes(x=FDbin,y=MedianTstat,fill=Model)) +
-  geom_boxplot(position="dodge") +
-  # geom_jitter(size=0.7,position=position_jitterdodge(jitter.width=0.2,dodge.width=0.75))+
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
   # geom_violin(draw_quantiles = 0.5)+
   facet_grid(rows=vars(ROI),cols=vars(Signal)) +
   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
@@ -557,8 +558,8 @@ ggplot(data=subset(tstat),mapping=aes(x=FD,y=Correlation,color=Model)) +
 fpath=paste(c(figsdir,"tstat.pdf"),collapse = "")
 ggsave(plot = pTstat , device = cairo_pdf, width = 7.5, units="in", height = 3.5, dpi = 1000,filename = fpath)
 
-fpath=paste(c(figsdir,"PRELIM_CorrvFD.pdf"),collapse = "")
-ggsave(plot = pCorrvFD, device = cairo_pdf, width = 7.5, units="in", height = 3.5, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"tstat_FDbins.pdf"),collapse = "")
+ggsave(plot = pTstatFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
 
 ## Stats
@@ -727,11 +728,11 @@ fpath=paste(c(figsdir,"PRELIM_percentActivated.pdf"),collapse = "")
 ggsave(plot = pPerAct, device = cairo_pdf, width = 3.5, units="in", height = 3.5, dpi = 1000,filename = fpath)
 
 ## FD bins
-# pBcoef <-
+pBcoefFDbin <-
   ggplot(data=subset(act,FDbin!="NA"),mapping=aes(x=FDbin,y=MedianBcoef,fill=Model)) +
-  geom_boxplot(position="dodge") +
-  # geom_point(position=position_dodge(width=0.75)) +
-  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+    geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+    scale_shape_manual(values = c(16, 17, 5, 3)) +  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
   # geom_violin(draw_quantiles = 0.5)+
   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
@@ -745,11 +746,11 @@ ggsave(plot = pPerAct, device = cairo_pdf, width = 3.5, units="in", height = 3.5
   theme(axis.title.x = element_text(size = 7),
         axis.title.y = element_text(size = 7))
 
-# pPerAct <-
+pPerActFDbin <-
   ggplot(data=subset(act,FDbin!="NA"),mapping=aes(x=FDbin,y=PerAct,fill=Model)) +
-  geom_boxplot(position="dodge") +
-  # geom_point(position=position_dodge(width=0.75)) +
-  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+    geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+    scale_shape_manual(values = c(16, 17, 5, 3)) +  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
   # geom_violin(draw_quantiles = 0.5)+
   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
@@ -774,3 +775,9 @@ pActStats <- plot_grid(pBcoef,pPerAct,pTstat,cols = 1,labels=c("A","B","C"))
 
 fpath=paste(c(figsdir,"DRAFT_ActivationMetrics.pdf"),collapse = "")
 ggsave(plot = pActStats, device = cairo_pdf, width = 7.5, units="in", height = 9, dpi = 1000,filename = fpath)
+
+fpath=paste(c(figsdir,"Bcoef_FDbins.pdf"),collapse = "")
+ggsave(plot = pBcoefFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+
+fpath=paste(c(figsdir,"PerAct_FDbins.pdf"),collapse = "")
+ggsave(plot = pPerActFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
