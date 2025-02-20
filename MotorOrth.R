@@ -32,11 +32,42 @@ motValsMH <- read.csv(paste0(onedrive,"/Motion/MS_HAND_MotionVals.csv"))
 motValsMH$Session <- factor(motValsMH$Session,levels=c("ses-01","ses-03"),labels=c("ses-01","ses-02"))
 
 motVals <- rbind(motValsHH,motValsHS,motValsMF,motValsMH)
-motVals$Metric <- factor(motVals$Metric,levels=c("FD","X","Y","Z","Roll","Pitch","Yaw","R2"))
-motVals$Task <- factor(motVals$Task,levels=c("Hand","MOTOR10","MOTOR25","MOTOR40","HAND","FOOT"),labels=c("Healthy HandGrasp","Healthy ShAbd 10%","Healthy ShAbd 25%","Healthy ShAbd 40%","MS HandGrasp","MS AnkFlex"))
+motVals$Metric <- factor(motVals$Metric,levels=c("FD","X","Y","Z","Roll","Pitch","Yaw","AdjR2"))
+motVals$Task <- factor(motVals$Task,levels=c("Hand","MOTOR10","MOTOR25","MOTOR40","HAND","Foot"),labels=c("Healthy Hand","HealthyShoulder 10%","HealthyShoulder 25%","HealthyShoulder 40%","MSHand","MSFoot"))
 motVals$Session <- factor(motVals$Session,labels=c("Run 1","Run 2"))
 
 # motVals$Subject <- factor(motVals$Subject,levels=c("sub-02","sub-03","sub-05","sub-09","sub-04","sub-11","sub-10","sub-07"),labels=c(1,2,3,4,5,6,7,8))
+
+# Distributions of FD and R2 across datasets
+quartiles <- motVals %>%
+  filter(Metric %in% c('AdjR2', 'FD')) %>%
+  group_by(Metric) %>%
+  summarize(
+    q25 = quantile(Value, 0.25),
+    q50 = quantile(Value, 0.50),
+    q75 = quantile(Value, 0.75)
+  ) %>%
+  tidyr::pivot_longer(cols = c(q25, q50, q75), names_to = "Quartile", values_to = "Value")
+
+# geom_density: x=Value,y = after_stat(count))
+pDist <-
+  ggplot(data=subset(motVals,Metric=='AdjR2' | Metric=='FD'),mapping=aes(x=Value,y = after_stat(count))) +
+  facet_grid(cols=vars(Metric),scales="free_x")+
+  # geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+  geom_density() +
+  geom_vline(data = quartiles, aes(xintercept = Value, color = Quartile), 
+             linetype = "dashed") +
+  scale_color_manual(values = c("q25" = "blue", "q50" = "red", "q75" = "green"),
+                     labels = c("25th", "50th", "75th")) +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+  
+fpath=paste(c(figsdir,"FD_R2_Distributions.pdf"),collapse = "")
+ggsave(plot = pDist, device = cairo_pdf, width = 5, units="in", height = 3, dpi = 1000,filename = fpath)
 
 # pMotCorr <-
   ggplot(data=subset(motVals,Metric!='FD'),mapping=aes(x=Metric,y=Subject)) +
@@ -54,6 +85,24 @@ motVals$Session <- factor(motVals$Session,labels=c("Run 1","Run 2"))
   theme(strip.text = element_text(size = rel(1)))+
   theme(axis.text.x = element_text(),axis.text.y = element_text()) +
     theme(strip.text.y = element_text(angle = 270)) +
+  theme(legend.position="top",legend.title = element_text(face="bold",size="9"))
+  
+pR2 <-
+  ggplot(data=subset(motVals,Metric=='AdjR2'),mapping=aes(x=Metric,y=Subject)) +
+  facet_grid(cols=vars(Session),rows=vars(Task),space="free",scales="free",switch="x") +
+  geom_tile(aes(fill=abs(Value))) +
+  geom_text(size=2.5,aes(label = round(abs(Value),digits=2),color=ifelse(abs(Value) < 0.6 ,"black","white"))) +
+  scale_color_manual(values=c("white","black"),guide=F) +
+  scale_fill_viridis_c(limits=c(0,1),
+                       guide=guide_colorbar(title.position="top",title.hjust=0.5,title=expression("Adjusted" ~ R^2))) +
+  labs(y="Healthy") +
+  theme_void(base_size = 7) +
+  scale_x_discrete(position = "top") +
+  scale_y_discrete(limits=rev) +
+  theme(plot.margin = margin(0, 0, 0, 0.3, "cm")) +
+  theme(strip.text = element_text(size = rel(1)))+
+  theme(axis.text.x = element_text(),axis.text.y = element_text()) +
+  theme(strip.text.y = element_text(angle = 270)) +
   theme(legend.position="top",legend.title = element_text(face="bold",size="9"))
 
 pFD <-
@@ -84,10 +133,10 @@ ggsave(plot = pMotCorr, device = cairo_pdf, width = 5, units="in", height = 8, d
 fpath=paste(c(figsdir,"FD.pdf"),collapse = "")
 ggsave(plot = pFD, device = cairo_pdf, width = 3.54, units="in", height = 8, dpi = 1000,filename = fpath)
 
-pFDCorr <- plot_grid(pFD, pMotCorr, ncol = 2, rel_widths=c(0.5,1))
+pFDCorr <- plot_grid(pFD, pR2, ncol = 2, rel_widths=c(1,1))
 
-fpath=paste(c(figsdir,"FDandCorr.pdf"),collapse = "")
-ggsave(plot = pFDCorr, device = cairo_pdf, width = 7.5, units="in", height = 8, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"FDandR2.pdf"),collapse = "")
+ggsave(plot = pFDCorr, device = cairo_pdf, width = 5, units="in", height = 8, dpi = 1000,filename = fpath)
 
 #
 # tSNR ------------------------------------------------------------------
@@ -101,7 +150,7 @@ load.tSNRdata <- function(filename){
   
 load.tSNRdata("HealthyHand_tSNR.txt")
 tSNRHH <- dfname
-load.tSNRdata("Shoulder_tSNR.txt")
+load.tSNRdata("Shoulder_tSNR_v3.txt")
 tSNRHS <- dfname
 load.tSNRdata("MSfoot_tSNR.txt")
 tSNRMF <- dfname
@@ -114,32 +163,32 @@ tSNRHH$Task <- "Hand"
 tSNRMF$Session <- factor(tSNRMF$Session,levels=c("ses-01","ses-03"),labels=c("ses-01","ses-02"))
 
 # Add FD column to tSNR datagrame
-for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsHH,Subject==sub & Session==ses & Metric=="FD")
-    tSNRHH$FD[tSNRHH$Subject==sub & tSNRHH$Session==ses] <- data$Value
-  }
-}
-for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
-  for (ses in c("ses-01","ses-02")){
-    for (task in c("MOTOR10","MOTOR25","MOTOR40")){
-      data <- subset(motValsHS,Subject==sub & Session==ses & Task==task & Metric=="FD")
-      tSNRHS$FD[tSNRHS$Subject==sub & tSNRHS$Session==ses & tSNRHS$Task==task] <- data$Value
-    }
-  }
-}
-for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsMF,Subject==sub & Session==ses & Metric=="FD")
-    tSNRMF$FD[tSNRMF$Subject==sub & tSNRMF$Session==ses] <- data$Value
-  }
-}
+# for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
+#   for (ses in c("ses-01","ses-02")){
+#     data <- subset(motValsHH,Subject==sub & Session==ses & Metric=="FD")
+#     tSNRHH$FD[tSNRHH$Subject==sub & tSNRHH$Session==ses] <- data$Value
+#   }
+# }
+# for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
+#   for (ses in c("ses-01","ses-02")){
+#     for (task in c("MOTOR10","MOTOR25","MOTOR40")){
+#       data <- subset(motValsHS,Subject==sub & Session==ses & Task==task & Metric=="FD")
+#       tSNRHS$FD[tSNRHS$Subject==sub & tSNRHS$Session==ses & tSNRHS$Task==task] <- data$Value
+#     }
+#   }
+# }
+# for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
+#   for (ses in c("ses-01","ses-02")){
+#     data <- subset(motValsMF,Subject==sub & Session==ses & Metric=="FD")
+#     tSNRMF$FD[tSNRMF$Subject==sub & tSNRMF$Session==ses] <- data$Value
+#   }
+# }
 
 tSNR <- rbind(tSNRHH,tSNRHS,tSNRMF,tSNRMH)
 tSNR$Task <- factor(tSNR$Task,levels=c("Hand","MOTOR10","MOTOR25","MOTOR40","HAND","FOOT"),labels=c("HealthyHand","HealthyShoulder 10%","HealthyShoulder 25%","HealthyShoulder 40%","MSHand","MSFoot"))
 tSNR$Group <- factor(tSNR$Group,levels=c("HealthyHand","Shoulder","MSHAND","MSfoot"),labels=c("HealthyHand","HealthyShoulder","MSHand","MSFoot"))
 
-tSNR$FD <- as.numeric(tSNR$FD)
+# tSNR$FD <- as.numeric(tSNR$FD)
 
 sig_df <- data.frame(
   ROI = c("Precentral gyrus"),
@@ -157,7 +206,7 @@ sig_df2 <- data.frame(
 sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
 
 # Plot median tSNR
-# pMed <-
+pMed <-
   ggplot(data=subset(tSNR),mapping=aes(x=Group,y=Median,fill=Model)) +
   facet_grid(rows=vars(ROI),space="free") +
   geom_boxplot(position="dodge") +
@@ -196,7 +245,7 @@ sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
   theme(axis.title.x = element_text(size = 7),
           axis.title.y = element_text(size = 7))
   
-fpath=paste(c(figsdir,"PRELIM_tSNR.pdf"),collapse = "")
+fpath=paste(c(figsdir,"tSNR.pdf"),collapse = "")
 ggsave(plot = pMed, device = cairo_pdf, width = 5, units="in", height = 3.5, dpi = 1000,filename = fpath)
 
 fpath=paste(c(figsdir,"PRELIM_tSNRvFD.pdf"),collapse = "")
@@ -226,7 +275,7 @@ load.corrdata <- function(filename){
 
 load.corrdata("HealthyHand_spatialCorr.txt")
 corrHH <- dfname
-load.corrdata("Shoulder_spatialCorr.txt")
+load.corrdata("Shoulder_spatialCorr_v3.txt")
 corrHS <- dfname
 load.corrdata("MSfoot_spatialCorr.txt")
 corrMF <- dfname
@@ -238,33 +287,47 @@ corrMF$Session[corrMF$Session == "ses-03"] <- "ses-02"
 corrMH$Session[corrMH$Session == "ses-03"] <- "ses-02"
 
 # Add FD column to correlation dataframe - average FD over both runs
+for (metric in c("FD","AdjR2")){
+  corrHH[[metric]] <- NA
+  corrHS[[metric]] <- NA
+  corrMH[[metric]] <- NA
+  corrMF[[metric]] <- NA
 for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
   # for (ses in c("ses-01","ses-02")){
-    data1 <- subset(motValsHH,Subject==sub & Session=="ses-01" & Metric=="FD")
-    data2 <- subset(motValsHH,Subject==sub & Session=="ses-02" & Metric=="FD")
-    corrHH$FD[corrHH$Subject==sub & corrHH$Session=="ses-02"] <- (data1$Value+data2$Value)/2
+    data1 <- subset(motValsHH,Subject==sub & Session=="ses-01" & Metric==metric)
+    data2 <- subset(motValsHH,Subject==sub & Session=="ses-02" & Metric==metric)
+    corrHH$temp[corrHH$Subject == sub] <- (data1$Value + data2$Value) / 2
   # }
 }
 for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
   for (task in c("MOTOR10","MOTOR25","MOTOR40")){
-    data1 <- subset(motValsHS,Subject==sub & Session=="ses-01" & Task==task & Metric=="FD")
-    data2 <- subset(motValsHS,Subject==sub & Session=="ses-02" & Task==task & Metric=="FD")
-    corrHS$FD[corrHS$Subject==sub & corrHS$Task==task & corrHS$Session=="ses-01"] <- (data1$Value+data2$Value)/2
+    data1 <- subset(motValsHS,Subject==sub & Session=="ses-01" & Task==task & Metric==metric)
+    data2 <- subset(motValsHS,Subject==sub & Session=="ses-02" & Task==task & Metric==metric)
+    corrHS$temp[corrHS$Subject==sub & corrHS$Task==task & corrHS$Session=="ses-01"] <- (data1$Value+data2$Value)/2
   }
 }
 for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
   # for (ses in c("ses-01","ses-02")){
-  data1 <- subset(motValsMF,Subject==sub & Session=="ses-01" & Metric=="FD")
-  data2 <- subset(motValsMF,Subject==sub & Session=="ses-02" & Metric=="FD")
-  corrMF$FD[corrMF$Subject==sub & corrMF$Session=="ses-01__ses-03"] <- (data1$Value+data2$Value)/2
+  data1 <- subset(motValsMF,Subject==sub & Session=="ses-01" & Metric==metric)
+  data2 <- subset(motValsMF,Subject==sub & Session=="ses-02" & Metric==metric)
+  corrMF$temp[corrMF$Subject==sub & corrMF$Session=="ses-01__ses-03"] <- (data1$Value+data2$Value)/2
   # }
 }
 for (sub in c("MS-02","MS-03","MS-04","MS-05","MS-07","MS-08","MS-10")){
   # for (ses in c("ses-01","ses-02")){
-    data1 <- subset(motValsMH,Subject==sub & Session=="ses-01" & Metric=="FD")
-    data2 <- subset(motValsMH,Subject==sub & Session=="ses-02" & Metric=="FD")
-    corrMH$FD[corrMH$Subject==sub & corrMH$Session=="ses-01_ses-03"] <- (data1$Value+data2$Value)/2
+    data1 <- subset(motValsMH,Subject==sub & Session=="ses-01" & Metric==metric)
+    data2 <- subset(motValsMH,Subject==sub & Session=="ses-02" & Metric==metric)
+    corrMH$temp[corrMH$Subject==sub & corrMH$Session=="ses-01_ses-03"] <- (data1$Value+data2$Value)/2
   # }
+}
+  corrHH[,metric] <- corrHH$temp
+  corrHH$temp <- NULL
+  corrHS[,metric] <- corrHS$temp
+  corrHS$temp <- NULL
+  corrMH[,metric] <- corrMH$temp
+  corrMH$temp <- NULL
+  corrMF[,metric] <- corrMF$temp
+  corrMF$temp <- NULL
 }
 
 corrHH$Task <- "HealthyHand"
@@ -286,6 +349,13 @@ corr <- corr %>%
   ))
 
 corr <- corr %>%
+  mutate(R2bin = case_when(
+    AdjR2 <= 0.5 ~ "Low",
+    AdjR2 > 0.5 ~ "High",
+    TRUE ~ NA_character_
+  ))
+
+corr <- corr %>%
   mutate(Signal = case_when(
     Task == "HealthyHand" ~ "High Signal",
     Task == "HealthyShoulder" ~ "Low Signal",
@@ -295,7 +365,8 @@ corr <- corr %>%
   ))
 
 corr$FDbin <- factor(corr$FDbin, levels = c("Low","Moderate","High"),labels=c("Low (FD \u2264 0.25)","Moderate (0.25 < FD \u2264 0.5)","High (FD > 0.5)"))
-corr$Model <- factor(corr$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","TaskCorr","Cons"))
+corr$R2bin <- factor(corr$R2bin, levels = c("Low","High"),labels=c("Low (R2 \u2264 0.5)","High (R2 > 0.5)"))
+corr$Model <- factor(corr$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","Mod","Cons"))
 
 
 # Plot spatial correlations
@@ -333,7 +404,7 @@ sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
         axis.title.y = element_text(size = 7))
 
 # Plot spatial correlation vs FD bins
- pCorrFDbins <-
+ # pCorrFDbins <-
    ggplot(data=subset(corr,FDbin!="NA"),mapping=aes(x=FDbin,y=Correlation,fill=Model)) +
   geom_boxplot(position="dodge",outlier.shape=NA) +
   geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
@@ -351,6 +422,66 @@ sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.title.x = element_text(size = 7),
         axis.title.y = element_text(size = 7))
+
+ pCorrR2bins <-
+ ggplot(data=subset(corr,R2bin!="NA"),mapping=aes(x=R2bin,y=Correlation,fill=Model)) +
+   geom_boxplot(position="dodge",outlier.shape=NA) +
+   geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+   scale_shape_manual(values = c(16, 17, 5, 3)) +
+   # geom_violin(draw_quantiles = 0.5)+
+   facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+   scale_fill_brewer(palette = "Dark2") +
+   guides(fill=guide_legend(title="Model")) +
+   labs(title="Spatial correlation in GM",y="Spatial correlation (r)") +
+   theme_light(base_size = 7) +
+   theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+         strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+   theme(plot.title = element_text(hjust = 0.5)) +
+   theme(axis.title.x = element_text(size = 7),
+         axis.title.y = element_text(size = 7))
+ 
+# Each figure one ROI
+ corrTidy <- pivot_longer(corr,cols=11:12,names_to="bin",values_to="binVal")
+ 
+ pCorrM1bins <-
+   ggplot(data=subset(corrTidy,binVal!="NA" & ROI=="Precentral gyrus"),mapping=aes(x=binVal,y=Correlation,fill=Model)) +
+   geom_boxplot(position="dodge",outlier.shape=NA) +
+   geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+   scale_shape_manual(values = c(16, 17, 5, 3)) +
+   # geom_violin(draw_quantiles = 0.5)+
+   facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+   scale_fill_brewer(palette = "Dark2") +
+   guides(fill=guide_legend(title="Model")) +
+   labs(title="Spatial correlation in Precentral gyrus GM",y="Spatial correlation (r)") +
+   theme_light(base_size = 7) +
+   theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+         strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+   theme(plot.title = element_text(hjust = 0.5)) +
+   theme(axis.title.x = element_text(size = 7),
+         axis.title.y = element_text(size = 7))
+ 
+ pCorrCerbins <-
+   ggplot(data=subset(corrTidy,binVal!="NA" & ROI=="Cerebellum"),mapping=aes(x=binVal,y=Correlation,fill=Model)) +
+   geom_boxplot(position="dodge",outlier.shape=NA) +
+   geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+   scale_shape_manual(values = c(16, 17, 5, 3)) +
+   # geom_violin(draw_quantiles = 0.5)+
+   facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+   scale_fill_brewer(palette = "Dark2") +
+   guides(fill=guide_legend(title="Model")) +
+   labs(title="Spatial correlation in Cerebellum GM",y="Spatial correlation (r)") +
+   theme_light(base_size = 7) +
+   theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+         strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+   theme(plot.title = element_text(hjust = 0.5)) +
+   theme(axis.title.x = element_text(size = 7),
+         axis.title.y = element_text(size = 7))
   
 # pCorrvFD <-
   ggplot(data=subset(corr),mapping=aes(x=FD,y=Correlation,color=Model)) +
@@ -375,8 +506,11 @@ sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
 fpath=paste(c(figsdir,"PRELIM_spatialCorr.pdf"),collapse = "")
 ggsave(plot = pCorr, device = cairo_pdf, width = 7.5, units="in", height = 3.5, dpi = 1000,filename = fpath)
 
-fpath=paste(c(figsdir,"SpatialCorr_FDbins.pdf"),collapse = "")
-ggsave(plot = pCorrFDbins, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"SpatialCorr_PrecentralGyrus_FDR2.pdf"),collapse = "")
+ggsave(plot = pCorrM1bins, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+
+fpath=paste(c(figsdir,"SpatialCorr_Cerebellum_FDR2.pdf"),collapse = "")
+ggsave(plot = pCorrCerbins, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
 pSpCorrall <- plot_grid(pCorr, pCorrvFD, 
                       labels = c("A", "B"), ncol = 1,rel_heights = c(1,1.5))
@@ -403,7 +537,7 @@ load.tstatdata <- function(filename){
 
 load.tstatdata("HealthyHand_tstat.txt")
 tstatHH <- dfname
-load.tstatdata("Shoulder_tstat.txt")
+load.tstatdata("Shoulder_tstat_v3.txt")
 tstatHS <- dfname
 load.tstatdata("MSfoot_tstat.txt")
 tstatMF <- dfname
@@ -414,32 +548,45 @@ tstatHH$Session[tstatHH$Task == "MOTORmotion"] <- "ses-02"
 tstatMF$Session[tstatMF$Session == "ses-03"] <- "ses-02"
 tstatMH$Session[tstatMH$Session == "ses-03"] <- "ses-02"
 
-# Add FD column to datagrame
-for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsHH,Subject==sub & Session==ses & Metric=="FD")
-    tstatHH$FD[tstatHH$Subject==sub & tstatHH$Session==ses] <- data$Value
-  }
-}
-for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
-  for (ses in c("ses-01","ses-02")){
-    for (task in c("MOTOR10","MOTOR25","MOTOR40")){
-      data <- subset(motValsHS,Subject==sub & Session==ses & Task==task & Metric=="FD")
-      tstatHS$FD[tstatHS$Subject==sub & tstatHS$Session==ses & tstatHS$Task==task] <- data$Value
+for (metric in c("FD","AdjR2")){
+  tstatHH[[metric]] <- NA
+  tstatHS[[metric]] <- NA
+  tstatMH[[metric]] <- NA
+  tstatMF[[metric]] <- NA
+  for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
+    for (ses in c("ses-01","ses-02")){
+      data <- subset(motValsHH,Subject==sub & Session==ses & Metric==metric)
+      tstatHH$temp[tstatHH$Subject == sub & tstatHH$Session == ses] <- data$Value
     }
   }
-}
-for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsMF,Subject==sub & Session==ses & Metric=="FD")
-    tstatMF$FD[tstatMF$Subject==sub & tstatMF$Session==ses] <- data$Value
+  for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
+    for (task in c("MOTOR10","MOTOR25","MOTOR40")){
+      for (ses in c("ses-01","ses-02")){
+        data <- subset(motValsHS,Subject==sub & Session==ses & Task==task & Metric==metric)
+        tstatHS$temp[tstatHS$Subject==sub & tstatHS$Task==task & tstatHS$Session==ses] <- data$Value
+      }
+    }
   }
-}
-for (sub in c("MS-02","MS-03","MS-04","MS-05","MS-07","MS-08","MS-10")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsMH,Subject==sub & Session==ses & Metric=="FD")
-    tstatMH$FD[tstatMH$Subject==sub & tstatMH$Session==ses] <- data$Value
+  for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
+    for (ses in c("ses-01","ses-02")){
+      data <- subset(motValsMF,Subject==sub & Session==ses & Metric==metric)
+      tstatMF$temp[tstatMF$Subject==sub & tstatMF$Session==ses] <- data$Value
+    }
   }
+  for (sub in c("MS-02","MS-03","MS-04","MS-05","MS-07","MS-08","MS-10")){
+    for (ses in c("ses-01","ses-02")){
+      data <- subset(motValsMH,Subject==sub & Session==ses & Metric==metric)
+      tstatMH$temp[tstatMH$Subject==sub & tstatMH$Session==ses] <- data$Value
+    }
+  }
+  tstatHH[,metric] <- tstatHH$temp
+  tstatHH$temp <- NULL
+  tstatHS[,metric] <- tstatHS$temp
+  tstatHS$temp <- NULL
+  tstatMH[,metric] <- tstatMH$temp
+  tstatMH$temp <- NULL
+  tstatMF[,metric] <- tstatMF$temp
+  tstatMF$temp <- NULL
 }
 
 
@@ -461,6 +608,12 @@ tstat <- tstat %>%
     TRUE ~ NA_character_
   ))
 tstat <- tstat %>%
+  mutate(R2bin = case_when(
+    AdjR2 <= 0.5 ~ "Low",
+    AdjR2 > 0.5 ~ "High",
+    TRUE ~ NA_character_
+  ))
+tstat <- tstat %>%
   mutate(Signal = case_when(
     Task == "HealthyHand" ~ "High Signal",
     Task == "HealthyShoulder" ~ "Low Signal",
@@ -469,8 +622,9 @@ tstat <- tstat %>%
     TRUE ~ NA_character_
   ))
 
+tstat$R2bin <- factor(tstat$R2bin, levels = c("Low","High"),labels=c("Low (R2 \u2264 0.5)","High (R2 > 0.5)"))
 tstat$FDbin <- factor(tstat$FDbin, levels = c("Low","Moderate","High"),labels=c("Low (FD \u2264 0.25)","Moderate (0.25 < FD \u2264 0.5)","High (FD > 0.5)"))
-tstat$Model <- factor(tstat$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","TaskCorr","Cons"))
+tstat$Model <- factor(tstat$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","Mod","Cons"))
 
 # Plot t-statistics
 sig_df <- data.frame(
@@ -540,7 +694,49 @@ pTstatFDbin <-
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.title.x = element_text(size = 7),
         axis.title.y = element_text(size = 7))
-  
+
+# Plot tstat vs R2 bins
+pTstatR2bin <-
+  ggplot(data=subset(tstat,R2bin!="NA"),mapping=aes(x=R2bin,y=MedianTstat,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Median t-statistic",y="Median t-statistic") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+# Each figure one ROI
+tstatTidy <- pivot_longer(tstat,cols=12:13,names_to="bin",values_to="binVal")
+
+# pTstatM1 <-
+  ggplot(data=subset(tstatTidy,bin!="NA",ROI=="Precentral gyrus"),mapping=aes(x=binVal,y=MedianTstat,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Median t-statistic in Precentral gyrus",y="Median t-statistic") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
 # pCorrvFD <-
 ggplot(data=subset(tstat),mapping=aes(x=FD,y=Correlation,color=Model)) +
   facet_grid(cols=vars(Task),rows=vars(ROI),scales="free") +
@@ -560,6 +756,9 @@ ggsave(plot = pTstat , device = cairo_pdf, width = 7.5, units="in", height = 3.5
 
 fpath=paste(c(figsdir,"tstat_FDbins.pdf"),collapse = "")
 ggsave(plot = pTstatFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+
+fpath=paste(c(figsdir,"tstat_R2bins.pdf"),collapse = "")
+ggsave(plot = pTstatR2bin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
 
 ## Stats
@@ -595,34 +794,46 @@ actHH$Session[actHH$Task == "MOTORmotion"] <- "ses-02"
 actMF$Session[actMF$Session == "ses-03"] <- "ses-02"
 actMH$Session[actMH$Session == "ses-03"] <- "ses-02"
 
-# Add FD column to datagrame
-for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsHH,Subject==sub & Session==ses & Metric=="FD")
-    actHH$FD[actHH$Subject==sub & actHH$Session==ses] <- data$Value
-  }
-}
-for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
-  for (ses in c("ses-01","ses-02")){
-    for (task in c("MOTOR10","MOTOR25","MOTOR40")){
-      data <- subset(motValsHS,Subject==sub & Session==ses & Task==task & Metric=="FD")
-      actHS$FD[actHS$Subject==sub & actHS$Session==ses & actHS$Task==task] <- data$Value
+for (metric in c("FD","AdjR2")){
+  actHH[[metric]] <- NA
+  actHS[[metric]] <- NA
+  actMH[[metric]] <- NA
+  actMF[[metric]] <- NA
+  for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
+    for (ses in c("ses-01","ses-02")){
+    data <- subset(motValsHH,Subject==sub & Session==ses & Metric==metric)
+    actHH$temp[actHH$Subject == sub & actHH$Session == ses] <- data$Value
     }
   }
-}
-for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsMF,Subject==sub & Session==ses & Metric=="FD")
-    actMF$FD[actMF$Subject==sub & actMF$Session==ses] <- data$Value
+  for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
+    for (task in c("MOTOR10","MOTOR25","MOTOR40")){
+      for (ses in c("ses-01","ses-02")){
+      data <- subset(motValsHS,Subject==sub & Session==ses & Task==task & Metric==metric)
+      actHS$temp[actHS$Subject==sub & actHS$Task==task & actHS$Session==ses] <- data$Value
+      }
+    }
   }
-}
-for (sub in c("MS-02","MS-03","MS-04","MS-05","MS-07","MS-08","MS-10")){
-  for (ses in c("ses-01","ses-02")){
-    data <- subset(motValsMH,Subject==sub & Session==ses & Metric=="FD")
-    actMH$FD[actMH$Subject==sub & actMH$Session==ses] <- data$Value
+  for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
+    for (ses in c("ses-01","ses-02")){
+    data <- subset(motValsMF,Subject==sub & Session==ses & Metric==metric)
+    actMF$temp[actMF$Subject==sub & actMF$Session==ses] <- data$Value
+    }
   }
+  for (sub in c("MS-02","MS-03","MS-04","MS-05","MS-07","MS-08","MS-10")){
+    for (ses in c("ses-01","ses-02")){
+    data <- subset(motValsMH,Subject==sub & Session==ses & Metric==metric)
+    actMH$temp[actMH$Subject==sub & actMH$Session==ses] <- data$Value
+    }
+  }
+  actHH[,metric] <- actHH$temp
+  actHH$temp <- NULL
+  actHS[,metric] <- actHS$temp
+  actHS$temp <- NULL
+  actMH[,metric] <- actMH$temp
+  actMH$temp <- NULL
+  actMF[,metric] <- actMF$temp
+  actMF$temp <- NULL
 }
-
 
 actHH$Task <- "HealthyHand"
 actHS$Task <- "HealthyShoulder"
@@ -641,7 +852,12 @@ act <- act %>%
     FD > 0.5 ~ "High",
     TRUE ~ NA_character_
   ))
-
+act <- act %>%
+  mutate(R2bin = case_when(
+    AdjR2 <= 0.5 ~ "Low",
+    AdjR2 > 0.5 ~ "High",
+    TRUE ~ NA_character_
+  ))
 act <- act %>%
   mutate(Signal = case_when(
     Task == "HealthyHand" ~ "High Signal",
@@ -651,6 +867,7 @@ act <- act %>%
     TRUE ~ NA_character_
   ))
 
+act$R2bin <- factor(act$R2bin, levels = c("Low","High"),labels=c("Low (R2 \u2264 0.5)","High (R2 > 0.5)"))
 act$FDbin <- factor(act$FDbin, levels = c("Low","Moderate","High"),labels=c("Low (FD \u2264 0.25)","Moderate (0.25 < FD \u2264 0.5)","High (FD > 0.5)"))
 act$Model <- factor(act$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","TaskCorr","Cons"))
 
@@ -764,6 +981,24 @@ pPerActFDbin <-
   theme(axis.title.x = element_text(size = 7),
         axis.title.y = element_text(size = 7))
 
+pPerActR2bin <-
+  ggplot(data=subset(act,R2bin!="NA"),mapping=aes(x=R2bin,y=PerAct,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Percent activated voxels",y="% activated voxels") +
+  theme_light(base_size = 7) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
 ## Stats
 mot1 <- subset(act,Task=="MS AnkFlex" & ROI=="Precentral gyrus")
 mod1 <- lmer(PerAct ~ Model + (1|Subject), data = mot1,REML=F)
@@ -781,3 +1016,6 @@ ggsave(plot = pBcoefFDbin, device = cairo_pdf, width = 7.5, units="in", height =
 
 fpath=paste(c(figsdir,"PerAct_FDbins.pdf"),collapse = "")
 ggsave(plot = pPerActFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+
+fpath=paste(c(figsdir,"PerAct_R2bins.pdf"),collapse = "")
+ggsave(plot = pPerActR2bin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
