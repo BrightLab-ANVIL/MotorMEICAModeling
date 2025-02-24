@@ -12,6 +12,7 @@ DO_tstat=0
 DO_activation=0
 ## END task loop
 DO_corr=0
+DO_dice=0
 
 parent_dir=""
 
@@ -266,6 +267,48 @@ then
     read -ra spatialCorr < ${output_dir}/${prefix}_spatialCorr.txt
 
     echo -e ${studyName} '\t' ${subject} '\t' ${session} '\t' ${task} '\t' ${model} '\t' ${reg} '\t' ${ROI} '\t' ${spatialCorr} >> ${parent_dir}/${studyName}_spatialCorr.txt
+
+  done
+fi
+
+if [ "${DO_dice}" -eq 1 ]
+
+then
+  echo "****************************"
+  echo "Running Dice coefficient"
+  echo "****************************"
+
+  if [ $ROI == 'cortex' ]; then
+    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_precentralGyrus_mask
+  elif [ $ROI == 'cerebellum' ]; then
+    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_cerebellum_mask
+  fi
+
+  for reg in Rgrip Lgrip
+  do
+
+    # Both tstat maps must be in the SAME FUNCTIONAL SPACE
+    # First convert map 2 to map 1's functional space if necessary
+    if [ ! -f ${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.GLM_${model}_${version}/${subject}_MOTORmotion_${reg}_tstat_fdrp05_func2funcMOTOR.nii.gz ]
+    then
+      # convert ses-02 func to ses-01 func space
+      ./x.PreProc_Transform_lin.sh "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.GLM_${model}_${version}/${subject}_MOTORmotion_${reg}_tstat_fdrp05" \
+        "${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.bet/${subject}_MOTOR_SBREF_1_bet_ero" \
+        "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.reg/${subject}_MOTORmotion_func2funcMOTOR" \
+        "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.GLM_${model}_${version}" \
+        func2funcMOTOR
+    fi
+
+    act_file1=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.GLM_${model}_${version}/${subject}_MOTOR_${reg}_tstat_fdrp05
+    act_file2=${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.GLM_${model}_${version}/${subject}_MOTORmotion_${reg}_tstat_fdrp05_func2funcMOTOR
+    output_dir=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.dice
+    prefix=${subject}_${reg}_${model}_${version}
+
+    ./x.dice_calc.sh ${act_file1} ${act_file2} ${mask} ${output_dir} ${prefix}
+
+    read -ra dice < ${output_dir}/${prefix}_dice.txt
+
+    echo -e ${studyName} '\t' ${subject} '\t' ${session} '\t' ${task} '\t' ${model} '\t' ${reg} '\t' ${ROI} '\t' ${dice} >> ${parent_dir}/${studyName}_dice.txt
 
   done
 
