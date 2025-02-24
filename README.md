@@ -32,8 +32,10 @@ Testing orthogonalization of ME-ICA components for motor-task analysis
 
 *x.tstat_calc.sh*: Function to calculate mean and median tSNR within a mask
 
+*x.activation_calc.sh*: Function to calculate mean and median beta coefficient and percent activated voxels within a mask
+
 *x.spatialCorr_calc.sh*: Function to calculate spatial correlation between beta coefficient maps from two runs, within a mask
 
-*x.activation_calc.sh*: Function to calculate mean and median beta coefficient and percent activated voxels within a mask
+*x.dice_calc.sh*: Function to calculate Dice coefficient between thresholded t-statistic maps from two runs, within a mask. Must have previously run *x.activation_calc.sh* to create the thresholded maps
 
 *x.RUN_Metrics_Example.sh*: Example script to run the above three functions for every dataset in a study and save outputs to text files
