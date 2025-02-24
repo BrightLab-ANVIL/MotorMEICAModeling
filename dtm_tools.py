@@ -1,4 +1,4 @@
-"""""Tools for comparing output component table results"""
+"""Tools for comparing output component table results"""
 
 from argparse import ArgumentParser
 import pandas as pd
@@ -23,15 +23,24 @@ RATIONALE_TABLE = {
     'N/A':  'N/A',
 }
 
-def get_table_type(table: pd.DataFrame) -> str:
-    if "classification" not in table.columns:
-        return "kundu-main"
-    else:
-        has_kundu_tag = any(any(t in tag_list for t in KUNDU_TAGS) for tag_list in table[TAG])
-        return "kundu-dtm" if has_kundu_tag else "minimal-dtm"
-
 def get_classification(row: pd.Series) -> str:
     return "R" if row["classification"] == "rejected" else "A"
+
+def save_summary(change_list, filename):
+    if change_list:
+        df_summary = pd.DataFrame(change_list)
+        df_summary = df_summary.groupby(["Session", "Change"]).agg({
+            "NumComponents": "sum",
+            "ComponentIndex": list,
+            "VarianceExplained": sum
+        }).reset_index()
+        df_summary["Percentage"] = (df_summary["NumComponents"] / total_components) * 100
+        df_summary.rename(columns={"ComponentIndex": "ComponentIndices", "VarianceExplained": "Varex"}, inplace=True)
+
+        if os.path.exists(filename):
+            df_summary.to_csv(filename, mode='a', header=False, index=False)
+        else:
+            df_summary.to_csv(filename, index=False)
 
 def main():
     parser = ArgumentParser(description='Prints the number of component classification changes.')
@@ -50,6 +59,7 @@ def main():
     if len(ltable) != len(rtable):
         raise ValueError(f"{args.left} has {len(ltable)} components, but {args.right} has {len(rtable)} components.")
 
+    global total_components
     total_components = len(ltable)
     changes_RtoA = []
     changes_AtoR = []
@@ -71,18 +81,6 @@ def main():
             elif lclass == "A" and rclass == "R":
                 changes_AtoR.append(change_entry)
     
-    def save_summary(change_list, filename):
-        if change_list:
-            df_summary = pd.DataFrame(change_list)
-            df_summary = df_summary.groupby(["Session", "Change"]).agg({
-                "NumComponents": "sum",
-                "ComponentIndex": list,
-                "VarianceExplained": sum
-            }).reset_index()
-            df_summary["Percentage"] = (df_summary["NumComponents"] / total_components) * 100
-            df_summary.rename(columns={"ComponentIndex": "ComponentIndices", "VarianceExplained": "Varex"}, inplace=True)
-            df_summary.to_csv(filename, index=False)
-        
     save_summary(changes_RtoA, "classification_changes_RtoA.csv")
     save_summary(changes_AtoR, "classification_changes_AtoR.csv")
 
@@ -95,9 +93,14 @@ def main():
         }).reset_index()
         df_both["Change"] = "Both"
         df_both["Percentage"] = (df_both["NumComponents"] / total_components) * 100
-        df_both.to_csv("classification_changes_Both.csv", index=False)
+        
+        filename_both = "classification_changes_Both.csv"
+        if os.path.exists(filename_both):
+            df_both.to_csv(filename_both, mode='a', header=False, index=False)
+        else:
+            df_both.to_csv(filename_both, index=False)
     
-    print("Classification changes saved to separate files.")
+    print("Classification changes appended to files.")
 
 if __name__ == '__main__':
     main()
