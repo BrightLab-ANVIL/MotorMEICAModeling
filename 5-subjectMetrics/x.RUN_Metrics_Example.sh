@@ -216,7 +216,7 @@ then
     fi
 
     tstat_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_tstat
-    mask=${parent_dir}/BIDS/derivatives/3dMEMA_${cond1}-0_Union_${version}/3dMEMA_${cond1}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_${side}
+    mask=${parent_dir}/BIDS/derivatives/3dMEMA_${cond1}-0_Union_${version}/3dMEMA_${cond1}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
     output_dir=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.tstat
     prefix=${subject}_${task}_${reg}_${model}_${version}
 
