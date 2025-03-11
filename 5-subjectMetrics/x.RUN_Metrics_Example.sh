@@ -6,6 +6,7 @@
 # Choose analysis options below (1=run)
 #######################################
 
+DO_laterMask=0
 DO_tSNR=0
 DO_extract=0
 DO_tstat=0
@@ -58,6 +59,43 @@ do
 echo "*********************"
 echo "Processing ${task}"
 echo "*********************"
+
+if [ "${DO_laterMask}" -eq 1 ]
+
+then
+  echo "***********************"
+  echo "Lateralize masks"
+  echo "***********************"
+
+  if [ $ROI == 'cortex' ]; then ROIname="precentralGyrus"
+  elif [ $ROI == 'cerebellum' ]; then ROIname="cerebellum"
+  fi
+
+  for side in left right ; do
+    # transform MNI left and right hemisphere masks to functional space
+    if [ ! -f "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_${ROIname}_mask_${side}.nii.gz" ]; then
+      ./x.PreProc_Transform_nonlin.sh ${parent_dir}/BIDS/masks/MNI152_T1_2mm_brain_mask_${side} \
+        ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_ero \
+        ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/${subject}_${task}_stand2func_warp \
+        ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg \
+        stand2func
+
+        # create a lateralized version of each mask
+        # grey matter masks
+        3dcalc -a "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/MNI152_T1_2mm_brain_mask_${side}_stand2func.nii.gz" \
+          -b "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_${ROIname}_mask.nii.gz" \
+          -expr 'a*b' -prefix "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_${ROIname}_mask_${side}.nii.gz"
+
+        # masks from group analysis
+        for reg in Rgrip Lgrip; do
+          3dcalc -a "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/MNI152_T1_2mm_brain_mask_${side}_stand2func.nii.gz" \
+            -b "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func.nii.gz" \
+            -expr 'a*b' -prefix "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}.nii.gz"
+        done
+    fi
+  done
+
+fi
 
 if [ "${DO_tSNR}" -eq 1 ]
 
@@ -158,7 +196,7 @@ then
   for reg in Rgrip Lgrip
   do
 
-    if [ ! -f "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func" ]; then
+    if [ ! -f "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func.nii.gz" ]; then
       # Transform union mask to functional space
       ./x.PreProc_Transform_nonlin.sh ${parent_dir}/BIDS/derivatives/group/3dMEMA_${reg}-0_Union_${version}/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin \
         ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_ero \
@@ -167,8 +205,18 @@ then
         stand2func
     fi
 
+    if [ $reg == "Rgrip" ] && [ $ROI == "cortex" ]; then
+      side="left"
+    elif [ $reg == "Rgrip" ] && [ $ROI == "cerebellum" ]; then
+      side="right"
+    elif [ $reg == "Lgrip" ] && [ $ROI == "cortex" ]; then
+      side="right"
+    elif [ $reg == "Lgrip" ] && [ $ROI == "cerebellum" ]; then
+      side="left"
+    fi
+
     tstat_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_tstat
-    mask=${parent_dir}/BIDS/derivatives/3dMEMA_${cond1}-0_Union_${version}/3dMEMA_${cond1}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin
+    mask=${parent_dir}/BIDS/derivatives/3dMEMA_${cond1}-0_Union_${version}/3dMEMA_${cond1}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_${side}
     output_dir=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.tstat
     prefix=${subject}_${task}_${reg}_${model}_${version}
 
@@ -190,7 +238,7 @@ then
   echo "Running activation stats calculation"
   echo "****************************"
 
-  if [ ! -f "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func" ]; then
+  if [ ! -f "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func.nii.gz" ]; then
     # Transform union mask to functional space
     ./x.PreProc_Transform_nonlin.sh ${parent_dir}/BIDS/derivatives/group/3dMEMA_${reg}-0_Union_${version}/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin \
       ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_ero \
@@ -199,9 +247,19 @@ then
       stand2func
   fi
 
+  if [ $reg == "Rgrip" ] && [ $ROI == "cortex" ]; then
+    side="left"
+  elif [ $reg == "Rgrip" ] && [ $ROI == "cerebellum" ]; then
+    side="right"
+  elif [ $reg == "Lgrip" ] && [ $ROI == "cortex" ]; then
+    side="right"
+  elif [ $reg == "Lgrip" ] && [ $ROI == "cerebellum" ]; then
+    side="left"
+  fi
+
   tstat_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_tstat
   bcoef_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_bcoef
-  mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func
+  mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
   brain_mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_mask_ero
   matrix_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_matrix
   output_dir=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.activation
@@ -230,12 +288,6 @@ then
   echo "Running spatial correlation"
   echo "****************************"
 
-  if [ $ROI == 'cortex' ]; then
-    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_precentralGyrus_mask
-  elif [ $ROI == 'cerebellum' ]; then
-    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_cerebellum_mask
-  fi
-
   for reg in Rgrip Lgrip
   do
 
@@ -255,6 +307,17 @@ then
         "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.reg/${subject}_MOTORmotion_func2funcMOTOR" \
         "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.GLM_${model}_${version}" \
         func2funcMOTOR
+    fi
+
+    # make sure this is calling the mask in the space that you want (e.g. session 1 or task 1)
+    if [ $reg == "Rgrip" ] && [ $ROI == "cortex" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_precentralGyrus_mask_left
+    elif [ $reg == "Rgrip" ] && [ $ROI == "cerebellum" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_cerebellum_mask_right
+    elif [ $reg == "Lgrip" ] && [ $ROI == "cortex" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_precentralGyrus_mask_right
+    elif [ $reg == "Lgrip" ] && [ $ROI == "cerebellum" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_cerebellum_mask_left
     fi
 
     bcoef_file1=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.GLM_${model}_${version}/${subject}_MOTOR_${reg}_bcoef
@@ -278,12 +341,6 @@ then
   echo "Running Dice coefficient"
   echo "****************************"
 
-  if [ $ROI == 'cortex' ]; then
-    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_precentralGyrus_mask
-  elif [ $ROI == 'cerebellum' ]; then
-    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/GM_cerebellum_mask
-  fi
-
   for reg in Rgrip Lgrip
   do
 
@@ -297,6 +354,17 @@ then
         "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.reg/${subject}_MOTORmotion_func2funcMOTOR" \
         "${parent_dir}/BIDS/derivatives/${subject}/func/MOTORmotion/output.GLM_${model}_${version}" \
         func2funcMOTOR
+    fi
+
+    # make sure this is calling the mask in the space that you want (e.g. session 1 or task 1)
+    if [ $reg == "Rgrip" ] && [ $ROI == "cortex" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_precentralGyrus_mask_left
+    elif [ $reg == "Rgrip" ] && [ $ROI == "cerebellum" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_cerebellum_mask_right
+    elif [ $reg == "Lgrip" ] && [ $ROI == "cortex" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_precentralGyrus_mask_right
+    elif [ $reg == "Lgrip" ] && [ $ROI == "cerebellum" ]; then
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.reg/GM_cerebellum_mask_left
     fi
 
     act_file1=${parent_dir}/BIDS/derivatives/${subject}/func/MOTOR/output.GLM_${model}_${version}/${subject}_MOTOR_${reg}_tstat_fdrp05
