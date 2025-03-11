@@ -526,6 +526,248 @@ mod1.emm <- emmeans(mod1,pairwise ~ Model,adjust="bonferroni")
 mod1.emm
 
 #
+
+# Dice --------------------------------------------------------------------
+
+load.dicedata <- function(filename){
+  # dfname<- read.csv(paste0(onedrive,"/subjectMetrics/",filename),header=F,sep="")
+  dfname<- read.csv("/Volumes/NR_External/Multiecho_backup_01122024/Multiecho_03162023/HealthyHand_dice.txt",header=F,sep="")
+  colnames(dfname) <- c("Group","Subject","Session","Task","Model","Regressor","ROI","Dice")
+  dfname$ROI <- factor(dfname$ROI,levels=c("cortex","cerebellum"),labels=c("Precentral gyrus","Cerebellum"))
+  dfname <<- dfname
+} 
+
+load.dicedata("HealthyHand_dice.txt")
+diceHH <- dfname
+load.dicedata("Shoulder_spatialCorr_v3.txt")
+corrHS <- dfname
+load.dicedata("MSfoot_spatialCorr.txt")
+corrMF <- dfname
+load.dicedata("MSHAND_spatialCorr.txt")
+corrMH <- dfname
+
+corrHH$Session[corrHH$Task == "MOTORmotion"] <- "ses-02"
+corrMF$Session[corrMF$Session == "ses-03"] <- "ses-02"
+corrMH$Session[corrMH$Session == "ses-03"] <- "ses-02"
+
+# Add FD column to correlation dataframe - average FD over both runs
+for (metric in c("FD","AdjR2")){
+  corrHH[[metric]] <- NA
+  corrHS[[metric]] <- NA
+  corrMH[[metric]] <- NA
+  corrMF[[metric]] <- NA
+  for (sub in c("sub-02","sub-03","sub-04","sub-05","sub-07","sub-09","sub-10","sub-11")){
+    # for (ses in c("ses-01","ses-02")){
+    data1 <- subset(motValsHH,Subject==sub & Session=="ses-01" & Metric==metric)
+    data2 <- subset(motValsHH,Subject==sub & Session=="ses-02" & Metric==metric)
+    corrHH$temp[corrHH$Subject == sub] <- (data1$Value + data2$Value) / 2
+    # }
+  }
+  for (sub in c("SP-01","SP-05","SP-06","SP-07","SP-08","SP-09","SP-10")){
+    for (task in c("MOTOR10","MOTOR25","MOTOR40")){
+      data1 <- subset(motValsHS,Subject==sub & Session=="ses-01" & Task==task & Metric==metric)
+      data2 <- subset(motValsHS,Subject==sub & Session=="ses-02" & Task==task & Metric==metric)
+      corrHS$temp[corrHS$Subject==sub & corrHS$Task==task & corrHS$Session=="ses-01"] <- (data1$Value+data2$Value)/2
+    }
+  }
+  for (sub in c("sub-02","sub-04","sub-05","sub-07","sub-08","sub-10")){
+    # for (ses in c("ses-01","ses-02")){
+    data1 <- subset(motValsMF,Subject==sub & Session=="ses-01" & Metric==metric)
+    data2 <- subset(motValsMF,Subject==sub & Session=="ses-02" & Metric==metric)
+    corrMF$temp[corrMF$Subject==sub & corrMF$Session=="ses-01__ses-03"] <- (data1$Value+data2$Value)/2
+    # }
+  }
+  for (sub in c("MS-02","MS-03","MS-04","MS-05","MS-07","MS-08","MS-10")){
+    # for (ses in c("ses-01","ses-02")){
+    data1 <- subset(motValsMH,Subject==sub & Session=="ses-01" & Metric==metric)
+    data2 <- subset(motValsMH,Subject==sub & Session=="ses-02" & Metric==metric)
+    corrMH$temp[corrMH$Subject==sub & corrMH$Session=="ses-01_ses-03"] <- (data1$Value+data2$Value)/2
+    # }
+  }
+  corrHH[,metric] <- corrHH$temp
+  corrHH$temp <- NULL
+  corrHS[,metric] <- corrHS$temp
+  corrHS$temp <- NULL
+  corrMH[,metric] <- corrMH$temp
+  corrMH$temp <- NULL
+  corrMF[,metric] <- corrMF$temp
+  corrMF$temp <- NULL
+}
+
+corrHH$Task <- "HealthyHand"
+corrHS$Task <- "HealthyShoulder"
+corrMF$Task <- "MSFoot"
+corrMH$Task <- "MSHand"
+corr <- rbind(corrHH,corrHS,corrMF,corrMH)
+corr$Task <- factor(corr$Task, levels = c("HealthyHand","HealthyShoulder","MSHand","MSFoot"))
+
+corr$FD <- as.numeric(corr$FD)
+
+# Create FD bins
+corr <- corr %>%
+  mutate(FDbin = case_when(
+    FD <= 0.25 ~ "Low",
+    FD > 0.25 & FD <= 0.5 ~ "Moderate",
+    FD > 0.5 ~ "High",
+    TRUE ~ NA_character_
+  ))
+
+corr <- corr %>%
+  mutate(R2bin = case_when(
+    AdjR2 <= 0.5 ~ "Low",
+    AdjR2 > 0.5 ~ "High",
+    TRUE ~ NA_character_
+  ))
+
+corr <- corr %>%
+  mutate(Signal = case_when(
+    Task == "HealthyHand" ~ "High Signal",
+    Task == "HealthyShoulder" ~ "Low Signal",
+    Task == "MSHand" ~ "High Signal",
+    Task == "MSFoot" ~ "Low Signal",
+    TRUE ~ NA_character_
+  ))
+
+corr$FDbin <- factor(corr$FDbin, levels = c("Low","Moderate","High"),labels=c("Low (FD \u2264 0.25)","Moderate (0.25 < FD \u2264 0.5)","High (FD > 0.5)"))
+corr$R2bin <- factor(corr$R2bin, levels = c("Low","High"),labels=c("Low (R2 \u2264 0.5)","High (R2 > 0.5)"))
+corr$Model <- factor(corr$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","Mod","Cons"))
+
+
+# Plot spatial correlations
+sig_df <- data.frame(
+  ROI = c("Precentral gyrus"),
+  start = c(0.75,0.75,1.75,2),
+  end = c(1,1.25,2,2.25),
+  ypos = c(0.8, 0.85,0.8,0.85),
+  label=c("","","",""))
+sig_df$ROI <- factor(sig_df$ROI,levels=c("Precentral gyrus","Cerebellum"))
+sig_df2 <- data.frame(
+  ROI = c("Cerebellum"),
+  start = c(0.75,0.75,1.75,2),
+  end = c(1,1.25,2,2.25),
+  ypos = c(0.5, 0.55,0.75,0.8),
+  label=c("","","",""))
+sig_df2$ROI <- factor(sig_df2$ROI,levels=c("Precentral gyrus","Cerebellum"))
+
+# pCorr <-
+ggplot(data=subset(diceHH),mapping=aes(x=Task,y=Dice,fill=Model)) +
+  geom_boxplot(position="dodge") +
+  # geom_jitter()+
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(rows=vars(ROI)) +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Spatial correlation in GM",y="Spatial correlation (r)") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+# Plot spatial correlation vs FD bins
+# pCorrFDbins <-
+ggplot(data=subset(corr,FDbin!="NA"),mapping=aes(x=FDbin,y=Correlation,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Spatial correlation in GM",y="Spatial correlation (r)") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+pCorrR2bins <-
+  ggplot(data=subset(corr,R2bin!="NA"),mapping=aes(x=R2bin,y=Correlation,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Spatial correlation in GM",y="Spatial correlation (r)") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+# Each figure one ROI
+corrTidy <- pivot_longer(corr,cols=11:12,names_to="bin",values_to="binVal")
+
+pCorrM1bins <-
+  ggplot(data=subset(corrTidy,binVal!="NA" & ROI=="Precentral gyrus"),mapping=aes(x=binVal,y=Correlation,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Spatial correlation in Precentral gyrus GM",y="Spatial correlation (r)") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+pCorrCerbins <-
+  ggplot(data=subset(corrTidy,binVal!="NA" & ROI=="Cerebellum"),mapping=aes(x=binVal,y=Correlation,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Spatial correlation in Cerebellum GM",y="Spatial correlation (r)") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+
+fpath=paste(c(figsdir,"SpatialCorr_PrecentralGyrus_FDR2.pdf"),collapse = "")
+ggsave(plot = pCorrM1bins, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+
+fpath=paste(c(figsdir,"SpatialCorr_Cerebellum_FDR2.pdf"),collapse = "")
+ggsave(plot = pCorrCerbins, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+
+pSpCorrall <- plot_grid(pCorr, pCorrvFD, 
+                        labels = c("A", "B"), ncol = 1,rel_heights = c(1,1.5))
+
+fpath=paste(c(figsdir,"spatialCorrelation.pdf"),collapse = "")
+ggsave(plot = pSpCorrall, device = cairo_pdf, width = 7.5, units="in", height = 7, dpi = 1000,filename = fpath)
+
+## Stats
+mot1 <- subset(corr,Task=="MS AnkFlex" & ROI=="Cerebellum")
+mod1 <- lmer(Correlation ~ Model + (1|Subject), data = mot1,REML=F)
+anova(mod1)
+mod1.emm <- emmeans(mod1,pairwise ~ Model,adjust="bonferroni")
+mod1.emm
+
+#
 # t-stat ------------------------------------------------------------------
 
 load.tstatdata <- function(filename){
@@ -718,8 +960,8 @@ pTstatR2bin <-
 # Each figure one ROI
 tstatTidy <- pivot_longer(tstat,cols=12:13,names_to="bin",values_to="binVal")
 
-# pTstatM1 <-
-  ggplot(data=subset(tstatTidy,bin!="NA",ROI=="Precentral gyrus"),mapping=aes(x=binVal,y=MedianTstat,fill=Model)) +
+pTstatM1 <-
+  ggplot(data=subset(tstatTidy,binVal!="NA" & ROI=="Precentral gyrus"),mapping=aes(x=binVal,y=MedianTstat,fill=Model)) +
   geom_boxplot(position="dodge",outlier.shape=NA) +
   geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
   scale_shape_manual(values = c(16, 17, 5, 3)) +
@@ -730,6 +972,25 @@ tstatTidy <- pivot_longer(tstat,cols=12:13,names_to="bin",values_to="binVal")
   scale_fill_brewer(palette = "Dark2") +
   guides(fill=guide_legend(title="Model")) +
   labs(title="Median t-statistic in Precentral gyrus",y="Median t-statistic") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+pTstatCer <-
+  ggplot(data=subset(tstatTidy,binVal!="NA" & ROI=="Cerebellum"),mapping=aes(x=binVal,y=MedianTstat,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Median t-statistic in Cerebellum",y="Median t-statistic") +
   theme_light(base_size = 7) +
   theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
         strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
@@ -754,11 +1015,11 @@ ggplot(data=subset(tstat),mapping=aes(x=FD,y=Correlation,color=Model)) +
 fpath=paste(c(figsdir,"tstat.pdf"),collapse = "")
 ggsave(plot = pTstat , device = cairo_pdf, width = 7.5, units="in", height = 3.5, dpi = 1000,filename = fpath)
 
-fpath=paste(c(figsdir,"tstat_FDbins.pdf"),collapse = "")
-ggsave(plot = pTstatFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"tstat_PrecentralGyrus_FDR2.pdf"),collapse = "")
+ggsave(plot = pTstatM1, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
-fpath=paste(c(figsdir,"tstat_R2bins.pdf"),collapse = "")
-ggsave(plot = pTstatR2bin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"tstat_Cerebellum_FDR2.pdf"),collapse = "")
+ggsave(plot = pTstatCer, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
 
 ## Stats
@@ -783,7 +1044,7 @@ load.actdata <- function(filename){
 
 load.actdata("HealthyHand_activation.txt")
 actHH <- dfname
-load.actdata("Shoulder_activation.txt")
+load.actdata("Shoulder_activation_v3.txt")
 actHS <- dfname
 load.actdata("MSfoot_Activation.txt")
 actMF <- dfname
@@ -869,7 +1130,7 @@ act <- act %>%
 
 act$R2bin <- factor(act$R2bin, levels = c("Low","High"),labels=c("Low (R2 \u2264 0.5)","High (R2 > 0.5)"))
 act$FDbin <- factor(act$FDbin, levels = c("Low","Moderate","High"),labels=c("Low (FD \u2264 0.25)","Moderate (0.25 < FD \u2264 0.5)","High (FD > 0.5)"))
-act$Model <- factor(act$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","TaskCorr","Cons"))
+act$Model <- factor(act$Model,levels=c("Basic","TaskCorr","ConsOrth"),labels=c("Agg","Mod","Cons"))
 
 
 # Plot activation metrics
@@ -967,7 +1228,8 @@ pPerActFDbin <-
   ggplot(data=subset(act,FDbin!="NA"),mapping=aes(x=FDbin,y=PerAct,fill=Model)) +
   geom_boxplot(position="dodge",outlier.shape=NA) +
     geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
-    scale_shape_manual(values = c(16, 17, 5, 3)) +  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+    scale_shape_manual(values = c(16, 17, 5, 3)) +  
+  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
   # geom_violin(draw_quantiles = 0.5)+
   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
@@ -985,7 +1247,8 @@ pPerActR2bin <-
   ggplot(data=subset(act,R2bin!="NA"),mapping=aes(x=R2bin,y=PerAct,fill=Model)) +
   geom_boxplot(position="dodge",outlier.shape=NA) +
   geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
-  scale_shape_manual(values = c(16, 17, 5, 3)) +  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
+  scale_shape_manual(values = c(16, 17, 5, 3)) +  
+  facet_grid(rows=vars(ROI),cols=vars(Signal)) +
   # geom_violin(draw_quantiles = 0.5)+
   # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
   # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
@@ -996,6 +1259,46 @@ pPerActR2bin <-
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
         strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+# Each figure one ROI
+actTidy <- pivot_longer(act,cols=13:14,names_to="bin",values_to="binVal")
+pActM1 <-
+  ggplot(data=subset(actTidy,binVal!="NA" & ROI=="Precentral gyrus"),mapping=aes(x=binVal,y=PerAct,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Percent activated voxels in Precentral gyrus",y="% activated voxels") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 7),
+        axis.title.y = element_text(size = 7))
+
+pActCer <-
+  ggplot(data=subset(actTidy,binVal!="NA" & ROI=="Cerebellum"),mapping=aes(x=binVal,y=PerAct,fill=Model)) +
+  geom_boxplot(position="dodge",outlier.shape=NA) +
+  geom_jitter(position=position_jitterdodge(jitter.width = 0.4, dodge.width = 0.75),aes(group=Model,shape=Task),size=0.7)+
+  scale_shape_manual(values = c(16, 17, 5, 3)) +
+  # geom_violin(draw_quantiles = 0.5)+
+  facet_grid(cols=vars(bin),rows=vars(Signal),scales="free") +
+  # geom_signif(data = sig_df,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  # geom_signif(data = sig_df2,aes(xmin=start,xmax=end,annotations=label,y_position=ypos),tip_length = 0,manual=TRUE,inherit.aes = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  guides(fill=guide_legend(title="Model")) +
+  labs(title="Percent activated voxels in Cerebellum",y="% activated voxels") +
+  theme_light(base_size = 7) +
+  theme(strip.text = element_text(face = "bold", size = rel(0.9),color="black"),
+        strip.background = element_rect(fill = "white", colour = "gray", size = 1)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.title.x = element_text(size = 7),
         axis.title.y = element_text(size = 7))
 
@@ -1014,8 +1317,8 @@ ggsave(plot = pActStats, device = cairo_pdf, width = 7.5, units="in", height = 9
 fpath=paste(c(figsdir,"Bcoef_FDbins.pdf"),collapse = "")
 ggsave(plot = pBcoefFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
-fpath=paste(c(figsdir,"PerAct_FDbins.pdf"),collapse = "")
-ggsave(plot = pPerActFDbin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"PerAct_PrecentralGyrus_FDR2.pdf"),collapse = "")
+ggsave(plot = pActM1, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
 
-fpath=paste(c(figsdir,"PerAct_R2bins.pdf"),collapse = "")
-ggsave(plot = pPerActR2bin, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
+fpath=paste(c(figsdir,"PerAct_Cerebellum_FDR2.pdf"),collapse = "")
+ggsave(plot = pActCer, device = cairo_pdf, width = 7.5, units="in", height = 6, dpi = 1000,filename = fpath)
