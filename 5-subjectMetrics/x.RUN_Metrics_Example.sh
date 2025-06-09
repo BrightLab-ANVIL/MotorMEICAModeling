@@ -95,6 +95,27 @@ then
     fi
   done
 
+  # Make masks that include results of group analysis ONLY in L or R upper/lower extremity M1
+  #### For hand task, use BN_Atlas_246_wmm_A4ul. For foot task, use BN_Atlas_246_2mm_A123ll #####
+  for side in L R ; do
+    # transform MNI left and right hemisphere masks to functional space
+    if [ ! -f "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}M1.nii.gz" ]; then
+      ./x.PreProc_Transform_nonlin.sh ${parent_dir}/BIDS/masks/BN_Atlas_246_2mm_A4ul_${side}_d2_${side}brain \
+        ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_ero \
+        ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/${subject}_${task}_stand2func_warp \
+        ${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg \
+        stand2func
+
+        # create a lateralized upper extremity or lower extremity M1 version of each mask
+        # masks from group analysis
+        for reg in Rgrip Lgrip; do
+          3dcalc -a "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/BN_Atlas_246_2mm_A4ul_${side}_d2_${side}brain_stand2func.nii.gz" \
+            -b "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func.nii.gz" \
+            -expr 'a*b' -prefix "${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}M1.nii.gz"
+        done
+    fi
+  done
+
 fi
 
 if [ "${DO_tSNR}" -eq 1 ]
@@ -206,17 +227,21 @@ then
     fi
 
     if [ $reg == "Rgrip" ] && [ $ROI == "cortex" ]; then
-      side="left"
+      side="L"
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}M1
     elif [ $reg == "Rgrip" ] && [ $ROI == "cerebellum" ]; then
       side="right"
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
     elif [ $reg == "Lgrip" ] && [ $ROI == "cortex" ]; then
-      side="right"
+      side="R"
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}M1
     elif [ $reg == "Lgrip" ] && [ $ROI == "cerebellum" ]; then
       side="left"
+      mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
     fi
 
     tstat_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_tstat
-    mask=${parent_dir}/BIDS/derivatives/3dMEMA_${cond1}-0_Union_${version}/3dMEMA_${cond1}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
+    # mask=${parent_dir}/BIDS/derivatives/3dMEMA_${cond1}-0_Union_${version}/3dMEMA_${cond1}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
     output_dir=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.tstat
     prefix=${subject}_${task}_${reg}_${model}_${version}
 
@@ -248,18 +273,22 @@ then
   fi
 
   if [ $reg == "Rgrip" ] && [ $ROI == "cortex" ]; then
-    side="left"
+    side="L"
+    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}M1
   elif [ $reg == "Rgrip" ] && [ $ROI == "cerebellum" ]; then
     side="right"
+    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
   elif [ $reg == "Lgrip" ] && [ $ROI == "cortex" ]; then
-    side="right"
+    side="R"
+    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}M1
   elif [ $reg == "Lgrip" ] && [ $ROI == "cerebellum" ]; then
     side="left"
+    mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
   fi
 
   tstat_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_tstat
   bcoef_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_${reg}_bcoef
-  mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
+  # mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.reg/3dMEMA_${reg}-0_Union_${version}_clusters_bcoef_p005_a05_${ROI}_bin_stand2func_${side}
   brain_mask=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.bet/${subject}_${task}_SBREF_1_bet_mask_ero
   matrix_file=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.GLM_${model}_${version}/${subject}_${task}_matrix
   output_dir=${parent_dir}/BIDS/derivatives/${subject}/func/${task}/output.activation
