@@ -1,5 +1,5 @@
-# MotorOrth
-Testing orthogonalization of ME-ICA components for motor-task analysis
+# MotorMEICAModeling
+Testing aggressive, moderate, and conservative methods of implementing rejected ME-ICA components in subject-level motor-task analysis.
 
 ## 1. Motor calculations
 *FDcorrCalc.m*: Function to calculate average FD and correlations of motion regressors with task regressor(s)
